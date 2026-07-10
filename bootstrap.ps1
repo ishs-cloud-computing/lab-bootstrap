@@ -160,17 +160,6 @@ function Expand-ToInstallDir {
     Remove-Item $tmp -Recurse -Force
 }
 
-# GitHub 최신 릴리스 태그 조회 (실패 시 $null)
-function Get-LatestGitHubTag {
-    param([string]$Repo)  # 예: "helm/helm"
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $r = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" `
-                               -Headers @{ 'User-Agent' = 'lab-bootstrap' } -TimeoutSec 30
-        return $r.tag_name
-    } catch { return $null }
-}
-
 # winget 사용 가능 여부
 function Test-Winget {
     if ($NoWinget) { return $false }
@@ -242,8 +231,13 @@ function Fallback-Ssm {
 }
 
 function Fallback-Helm {
-    $tag = Get-LatestGitHubTag 'helm/helm'          # 예: v3.16.3
-    $ver = if ($tag) { $tag.TrimStart('v') } else { $HelmPinned }
+    $ver = $HelmPinned
+    try {                                            # 최신 릴리스 태그(예: v3.16.3) 조회, 실패하면 pin 사용
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $tag = (Invoke-RestMethod -Uri 'https://api.github.com/repos/helm/helm/releases/latest' `
+                                  -Headers @{ 'User-Agent' = 'lab-bootstrap' } -TimeoutSec 30).tag_name
+        if ($tag) { $ver = $tag.TrimStart('v') }
+    } catch { Write-Warn "Helm 최신 버전 조회 실패 → pin($HelmPinned) 사용" }
     $zip = Join-Path $env:TEMP "helm-$ver.zip"
     Get-Download "https://get.helm.sh/helm-v$ver-windows-amd64.zip" $zip
     Expand-ToInstallDir -Zip $zip -ExeName 'helm.exe'
@@ -339,6 +333,40 @@ function Install-Kubectl {
 }
 
 # ===========================================================================
+# ssh-agent 서비스 활성화 — 시작 유형을 Automatic 으로 설정하고 즉시 시작
+# (Windows 10/11 에 기본 포함된 OpenSSH Client 의 ssh-agent 서비스를 사용)
+# 재부팅되는 실습 PC 를 가정 → 로그인 시 자동으로 켜지도록 Automatic 지정.
+# ===========================================================================
+function Enable-SshAgent {
+    Write-Step "ssh-agent 서비스 활성화"
+
+    $svc = Get-Service -Name 'ssh-agent' -ErrorAction SilentlyContinue
+    if (-not $svc) {
+        Write-Warn "ssh-agent 서비스를 찾을 수 없습니다. OpenSSH Client 기능이 설치돼 있는지 확인하세요."
+        Write-Warn "설치: 설정 > 앱 > 선택적 기능 > 'OpenSSH 클라이언트' 추가 (또는 Add-WindowsCapability)"
+        return $false
+    }
+
+    try {
+        # 시작 유형을 자동으로 (재부팅 후에도 자동 실행). 일부 환경은 Disabled 라 먼저 풀어줘야 함.
+        Set-Service -Name 'ssh-agent' -StartupType Automatic -ErrorAction Stop
+        Write-Ok "시작 유형 = Automatic"
+
+        $svc = Get-Service -Name 'ssh-agent'
+        if ($svc.Status -ne 'Running') {
+            Start-Service -Name 'ssh-agent' -ErrorAction Stop
+            Write-Ok "ssh-agent 서비스 시작됨"
+        } else {
+            Write-Skip "이미 실행 중"
+        }
+        return $true
+    } catch {
+        Write-Err "ssh-agent 서비스 설정 실패: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+# ===========================================================================
 # 최종 검증: 각 도구 버전 실행 → OK/FAIL 요약
 # ===========================================================================
 function Invoke-Verification {
@@ -371,6 +399,14 @@ function Invoke-Verification {
         }
     }
 
+    # ssh-agent 서비스 상태 요약
+    $ssh = Get-Service -Name 'ssh-agent' -ErrorAction SilentlyContinue
+    if ($ssh) {
+        Write-Ok ("{0,-12} {1} (StartType={2})" -f 'ssh-agent', $ssh.Status, $ssh.StartType)
+    } else {
+        Write-Err ("{0,-12} 서비스 없음 (OpenSSH Client 미설치)" -f 'ssh-agent')
+    }
+
     Write-Host ""
     if ($fails.Count -eq 0) {
         Write-Host "모든 도구가 정상 설치되었습니다. ✅" -ForegroundColor Green
@@ -401,23 +437,27 @@ Write-Host "=======================================================" -Foreground
 if (-not (Test-Path $InstallDir)) { New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null }
 Add-SystemPath $InstallDir
 
-$results = @{}
+# 하나라도 실패하면 $ok 가 false 가 됨. (설치 호출은 항상 좌변에 둬 매번 실행되도록)
+$ok = $true
 
 # winget 우선 + 직접 다운로드 fallback 을 갖는 도구들
-$results['AWS CLI']    = Install-Tool -Name 'AWS CLI v2'        -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'                 -Fallback ${function:Fallback-AwsCli}
-$results['SSM plugin'] = Install-Tool -Name 'SSM plugin'        -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin'   -Fallback ${function:Fallback-Ssm}
-$results['Helm']       = Install-Tool -Name 'Helm'              -Cmd 'helm'                   -WingetId 'Helm.Helm'                     -Fallback ${function:Fallback-Helm}
-$results['eksctl']     = Install-Tool -Name 'eksctl'            -Cmd 'eksctl'                 -WingetId $null                           -Fallback ${function:Fallback-Eksctl}
-$results['Terraform']  = Install-Tool -Name 'Terraform'         -Cmd 'terraform'              -WingetId 'Hashicorp.Terraform'           -Fallback ${function:Fallback-Terraform}
-$results['VS Code']    = Install-Tool -Name 'VS Code'           -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode'    -Fallback ${function:Fallback-VSCode}
-$results['k9s']        = Install-Tool -Name 'k9s'               -Cmd 'k9s'                    -WingetId 'Derailed.k9s'                  -Fallback ${function:Fallback-K9s}
+$ok = (Install-Tool -Name 'AWS CLI v2' -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'               -Fallback ${function:Fallback-AwsCli})   -and $ok
+$ok = (Install-Tool -Name 'SSM plugin' -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin' -Fallback ${function:Fallback-Ssm})      -and $ok
+$ok = (Install-Tool -Name 'Helm'       -Cmd 'helm'                   -WingetId 'Helm.Helm'                   -Fallback ${function:Fallback-Helm})      -and $ok
+$ok = (Install-Tool -Name 'eksctl'     -Cmd 'eksctl'                 -WingetId $null                         -Fallback ${function:Fallback-Eksctl})    -and $ok
+$ok = (Install-Tool -Name 'Terraform'  -Cmd 'terraform'              -WingetId 'Hashicorp.Terraform'        -Fallback ${function:Fallback-Terraform}) -and $ok
+$ok = (Install-Tool -Name 'VS Code'    -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode' -Fallback ${function:Fallback-VSCode})    -and $ok
+$ok = (Install-Tool -Name 'k9s'        -Cmd 'k9s'                    -WingetId 'Derailed.k9s'               -Fallback ${function:Fallback-K9s})       -and $ok
 
 # kubectl 은 항상 EKS S3 직접 (차단 우회)
-$results['kubectl']    = Install-Kubectl
+$ok = (Install-Kubectl) -and $ok
+
+# ssh-agent 서비스 자동 시작 설정 (도구 설치와 별개의 시스템 구성)
+$ok = (Enable-SshAgent) -and $ok
 
 Invoke-Verification
 
 Stop-Transcript | Out-Null
 
 # 하나라도 실패하면 비정상 종료코드
-if ($results.Values -contains $false) { exit 1 } else { exit 0 }
+if ($ok) { exit 0 } else { exit 1 }
