@@ -18,7 +18,7 @@
 
 .PARAMETER KubectlMinor
     설치할 kubectl 마이너 버전 (예: "1.32"). 아래 $KubectlMap 에서 조회한다.
-    사용하는 EKS 클러스터 버전에 맞춰 조정. 기본값 "1.32".
+    사용하는 EKS 클러스터 버전에 맞춰 조정. 기본값 "1.35".
 
 .PARAMETER InstallDir
     직접 다운로드(portable) 바이너리를 배치할 폴더. 시스템 PATH 에 추가된다. 기본값 "C:\cloud-tools\bin".
@@ -37,7 +37,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$KubectlMinor = "1.32",
+    [string]$KubectlMinor = "1.35",
     [string]$InstallDir   = "C:\cloud-tools\bin",
     [switch]$NoWinget,
     [switch]$Force

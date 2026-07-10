@@ -66,7 +66,7 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
 
 | 파라미터 | 기본값 | 설명 |
 |---|---|---|
-| `-KubectlMinor` | `1.32` | 설치할 kubectl 마이너 버전. **사용하는 EKS 클러스터 버전에 맞춰** 지정. (지원: 1.30 ~ 1.35) |
+| `-KubectlMinor` | `1.35` | 설치할 kubectl 마이너 버전. **사용하는 EKS 클러스터 버전에 맞춰** 지정. (지원: 1.30 ~ 1.35) |
 | `-InstallDir` | `C:\cloud-tools\bin` | 직접 다운로드한 portable 바이너리 배치 폴더 (시스템 PATH 에 자동 추가) |
 | `-NoWinget` | (off) | winget 을 건너뛰고 **모든 도구를 직접 다운로드**로 설치 |
 | `-Force` | (off) | 이미 설치돼 있어도 다시 설치 |
