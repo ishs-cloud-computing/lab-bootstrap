@@ -49,7 +49,7 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
 ### 2) 원라이너 (레포 raw URL, github.com 접근 가능 시)
 
 ```powershell
-irm https://raw.githubusercontent.com/<사용자>/lab-bootstrap/main/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/ishs-cloud-computing/lab-bootstrap/main/bootstrap.ps1 | iex
 ```
 
 실행이 끝나면 8개 도구의 버전을 실행해 **OK / FAIL 요약 표**를 출력한다.
