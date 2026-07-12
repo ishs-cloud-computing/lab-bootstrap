@@ -4,7 +4,7 @@
     학교 실습실 Windows PC에 클라우드 컴퓨팅 실습용 도구를 자동 설치하는 부트스트랩 스크립트.
 
 .DESCRIPTION
-    설치 대상: AWS CLI v2, SSM(Session Manager) 플러그인, Helm, eksctl, kubectl, Terraform, VS Code, k9s.
+    설치 대상: Git, Git LFS, AWS CLI v2, SSM(Session Manager) 플러그인, Helm, eksctl, kubectl, Terraform, VS Code, k9s.
 
     핵심 설계
     ---------
@@ -284,6 +284,33 @@ function Fallback-K9s {
     Add-SystemPath $InstallDir
 }
 
+function Fallback-Git {
+    # 릴리스 자산명에 버전이 박혀 있어 stable URL 이 없음 → API 로 64-bit 무인 설치 파일 조회
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/git-for-windows/git/releases/latest' `
+                             -Headers @{ 'User-Agent' = 'lab-bootstrap' } -TimeoutSec 30
+    $asset = $rel.assets | Where-Object { $_.name -like 'Git-*-64-bit.exe' } | Select-Object -First 1
+    if (-not $asset) { throw 'Git for Windows 설치 파일을 찾을 수 없습니다.' }
+    $exe = Join-Path $env:TEMP $asset.name
+    Get-Download $asset.browser_download_url $exe
+    # Inno Setup 무인 설치 (설치 후 PATH 는 installer 가 등록)
+    Start-Process $exe -ArgumentList '/VERYSILENT','/NORESTART','/NOCANCEL','/SP-' -Wait
+    Remove-Item $exe -Force -ErrorAction SilentlyContinue
+}
+
+function Fallback-GitLfs {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/git-lfs/git-lfs/releases/latest' `
+                             -Headers @{ 'User-Agent' = 'lab-bootstrap' } -TimeoutSec 30
+    $asset = $rel.assets | Where-Object { $_.name -like 'git-lfs-windows-amd64-*.zip' } | Select-Object -First 1
+    if (-not $asset) { throw 'git-lfs zip 을 찾을 수 없습니다.' }
+    $zip = Join-Path $env:TEMP 'git-lfs.zip'
+    Get-Download $asset.browser_download_url $zip
+    Expand-ToInstallDir -Zip $zip -ExeName 'git-lfs.exe'
+    Remove-Item $zip -Force -ErrorAction SilentlyContinue
+    Add-SystemPath $InstallDir
+}
+
 # ===========================================================================
 # kubectl 전용 설치 — dl.k8s.io 차단 우회 (Amazon EKS S3 미러 + SHA256 검증)
 # winget/choco 를 쓰지 않는 이유: 그 패키지들도 결국 차단된 dl.k8s.io 에서 받기 때문.
@@ -373,6 +400,8 @@ function Invoke-Verification {
     Write-Step "설치 검증"
     Sync-Path
     $checks = @(
+        @{ Name = 'Git';            Cmd = 'git';                    Args = @('--version') }
+        @{ Name = 'Git LFS';        Cmd = 'git-lfs';                Args = @('version') }
         @{ Name = 'AWS CLI';        Cmd = 'aws';                    Args = @('--version') }
         @{ Name = 'SSM plugin';     Cmd = 'session-manager-plugin'; Args = @('--version') }
         @{ Name = 'Helm';           Cmd = 'helm';                   Args = @('version','--short') }
@@ -441,6 +470,8 @@ Add-SystemPath $InstallDir
 $ok = $true
 
 # winget 우선 + 직접 다운로드 fallback 을 갖는 도구들
+$ok = (Install-Tool -Name 'Git'        -Cmd 'git'                    -WingetId 'Git.Git'                    -Fallback ${function:Fallback-Git})       -and $ok
+$ok = (Install-Tool -Name 'Git LFS'    -Cmd 'git-lfs'                -WingetId 'GitHub.GitLFS'              -Fallback ${function:Fallback-GitLfs})    -and $ok
 $ok = (Install-Tool -Name 'AWS CLI v2' -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'               -Fallback ${function:Fallback-AwsCli})   -and $ok
 $ok = (Install-Tool -Name 'SSM plugin' -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin' -Fallback ${function:Fallback-Ssm})      -and $ok
 $ok = (Install-Tool -Name 'Helm'       -Cmd 'helm'                   -WingetId 'Helm.Helm'                   -Fallback ${function:Fallback-Helm})      -and $ok
@@ -448,6 +479,12 @@ $ok = (Install-Tool -Name 'eksctl'     -Cmd 'eksctl'                 -WingetId $
 $ok = (Install-Tool -Name 'Terraform'  -Cmd 'terraform'              -WingetId 'Hashicorp.Terraform'        -Fallback ${function:Fallback-Terraform}) -and $ok
 $ok = (Install-Tool -Name 'VS Code'    -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode' -Fallback ${function:Fallback-VSCode})    -and $ok
 $ok = (Install-Tool -Name 'k9s'        -Cmd 'k9s'                    -WingetId 'Derailed.k9s'               -Fallback ${function:Fallback-K9s})       -and $ok
+
+# git-lfs 는 설치만으로는 git 에 훅되지 않음 → 시스템 전역으로 등록 (idempotent)
+if ((Test-Tool 'git') -and (Test-Tool 'git-lfs')) {
+    try { git lfs install --system 2>&1 | Out-Null; Write-Ok "git lfs install --system 완료" }
+    catch { Write-Warn "git lfs install 실패: $($_.Exception.Message)" }
+}
 
 # kubectl 은 항상 EKS S3 직접 (차단 우회)
 $ok = (Install-Kubectl) -and $ok

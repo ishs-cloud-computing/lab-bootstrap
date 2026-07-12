@@ -6,6 +6,8 @@
 
 | 도구 | 용도 |
 |---|---|
+| **Git** | 버전 관리 |
+| **Git LFS** | Git 대용량 파일 저장소 |
 | **AWS CLI v2** | AWS 명령행 도구 |
 | **SSM 플러그인** | Session Manager 로 인스턴스 접속 (`aws ssm start-session`) |
 | **Helm** | Kubernetes 패키지 매니저 |
