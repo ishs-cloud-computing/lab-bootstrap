@@ -51,11 +51,13 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
 ### 2) 원라이너 (레포 raw URL, github.com 접근 가능 시)
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ishs-cloud-computing/lab-bootstrap/main/bootstrap.ps1)))
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ishs-cloud-computing/lab-bootstrap/main/bootstrap.ps1).TrimStart([char]0xFEFF)))
 ```
 
 > `irm ... | iex` 는 `param()` 블록이 있는 스크립트에서 실패한다(`iex` 가 param 토큰을 처리 못 함).
-> 파라미터를 넘기려면 뒤에 붙인다: `& ([scriptblock]::Create((irm <URL>))) -KubectlMinor 1.31`
+> `.TrimStart([char]0xFEFF)` 는 `irm` 이 남기는 UTF-8 BOM 을 떼어낸다. 안 떼면 BOM 이 첫 구문으로 파싱돼
+> `param()` 이 스크립트 첫 구문이 아니게 되고 `[CmdletBinding()]` 줄에서 파싱 에러가 난다.
+> 파라미터를 넘기려면 뒤에 붙인다: `& ([scriptblock]::Create((irm <URL>).TrimStart([char]0xFEFF))) -KubectlMinor 1.31`
 
 실행이 끝나면 8개 도구의 버전을 실행해 **OK / FAIL 요약 표**를 출력한다.
 특히 `kubectl version --client` 결과가 `v1.32.x-eks-...` 처럼 `-eks-` 빌드 문자열이면 차단 우회 성공이다.
