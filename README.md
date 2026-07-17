@@ -6,6 +6,7 @@
 
 | 도구 | 용도 |
 |---|---|
+| **PowerShell 7** | 최신 PowerShell 셸 (`pwsh`) |
 | **Git** | 버전 관리 |
 | **Git LFS** | Git 대용량 파일 저장소 |
 | **AWS CLI v2** | AWS 명령행 도구 |
@@ -59,7 +60,7 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
 > `param()` 이 스크립트 첫 구문이 아니게 되고 `[CmdletBinding()]` 줄에서 파싱 에러가 난다.
 > 파라미터를 넘기려면 뒤에 붙인다: `& ([scriptblock]::Create((irm <URL>).TrimStart([char]0xFEFF))) -KubectlMinor 1.31`
 
-실행이 끝나면 8개 도구의 버전을 실행해 **OK / FAIL 요약 표**를 출력한다.
+실행이 끝나면 모든 도구의 버전을 실행해 **OK / FAIL 요약 표**를 출력한다.
 특히 `kubectl version --client` 결과가 `v1.32.x-eks-...` 처럼 `-eks-` 빌드 문자열이면 차단 우회 성공이다.
 
 > 설치 직후에는 새 터미널을 하나 열어야 PATH 가 완전히 반영된다.

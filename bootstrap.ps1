@@ -4,7 +4,7 @@
     학교 실습실 Windows PC에 클라우드 컴퓨팅 실습용 도구를 자동 설치하는 부트스트랩 스크립트.
 
 .DESCRIPTION
-    설치 대상: Git, Git LFS, AWS CLI v2, SSM(Session Manager) 플러그인, Helm, eksctl, kubectl, Terraform, VS Code, k9s.
+    설치 대상: PowerShell 7, Git, Git LFS, AWS CLI v2, SSM(Session Manager) 플러그인, Helm, eksctl, kubectl, Terraform, VS Code, k9s.
 
     핵심 설계
     ---------
@@ -312,6 +312,21 @@ function Fallback-GitLfs {
     Add-SystemPath $InstallDir
 }
 
+function Fallback-Pwsh {
+    # 릴리스 자산명에 버전이 박혀 있어 stable URL 이 없음 → API 로 x64 MSI 조회
+    # releases/latest 는 prerelease 를 제외하므로 RC 를 집을 일이 없다.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/PowerShell/PowerShell/releases/latest' `
+                             -Headers @{ 'User-Agent' = 'lab-bootstrap' } -TimeoutSec 30
+    $asset = $rel.assets | Where-Object { $_.name -like 'PowerShell-*-win-x64.msi' } | Select-Object -First 1
+    if (-not $asset) { throw 'PowerShell 7 MSI 를 찾을 수 없습니다.' }
+    $msi = Join-Path $env:TEMP $asset.name
+    Get-Download $asset.browser_download_url $msi
+    # 무인 설치 (PATH 등록은 MSI 가 함 — ADD_PATH 기본값 1)
+    Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
+    Remove-Item $msi -Force -ErrorAction SilentlyContinue
+}
+
 # ===========================================================================
 # kubectl 전용 설치 — dl.k8s.io 차단 우회 (Amazon EKS S3 미러 + SHA256 검증)
 # winget/choco 를 쓰지 않는 이유: 그 패키지들도 결국 차단된 dl.k8s.io 에서 받기 때문.
@@ -401,6 +416,7 @@ function Invoke-Verification {
     Write-Step "설치 검증"
     Sync-Path
     $checks = @(
+        @{ Name = 'PowerShell 7';   Cmd = 'pwsh';                   Args = @('--version') }
         @{ Name = 'Git';            Cmd = 'git';                    Args = @('--version') }
         @{ Name = 'Git LFS';        Cmd = 'git-lfs';                Args = @('version') }
         @{ Name = 'AWS CLI';        Cmd = 'aws';                    Args = @('--version') }
@@ -471,15 +487,16 @@ Add-SystemPath $InstallDir
 $ok = $true
 
 # winget 우선 + 직접 다운로드 fallback 을 갖는 도구들
-$ok = (Install-Tool -Name 'Git'        -Cmd 'git'                    -WingetId 'Git.Git'                    -Fallback ${function:Fallback-Git})       -and $ok
-$ok = (Install-Tool -Name 'Git LFS'    -Cmd 'git-lfs'                -WingetId 'GitHub.GitLFS'              -Fallback ${function:Fallback-GitLfs})    -and $ok
-$ok = (Install-Tool -Name 'AWS CLI v2' -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'               -Fallback ${function:Fallback-AwsCli})   -and $ok
-$ok = (Install-Tool -Name 'SSM plugin' -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin' -Fallback ${function:Fallback-Ssm})      -and $ok
-$ok = (Install-Tool -Name 'Helm'       -Cmd 'helm'                   -WingetId 'Helm.Helm'                   -Fallback ${function:Fallback-Helm})      -and $ok
-$ok = (Install-Tool -Name 'eksctl'     -Cmd 'eksctl'                 -WingetId $null                         -Fallback ${function:Fallback-Eksctl})    -and $ok
-$ok = (Install-Tool -Name 'Terraform'  -Cmd 'terraform'              -WingetId 'Hashicorp.Terraform'        -Fallback ${function:Fallback-Terraform}) -and $ok
-$ok = (Install-Tool -Name 'VS Code'    -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode' -Fallback ${function:Fallback-VSCode})    -and $ok
-$ok = (Install-Tool -Name 'k9s'        -Cmd 'k9s'                    -WingetId 'Derailed.k9s'               -Fallback ${function:Fallback-K9s})       -and $ok
+$ok = (Install-Tool -Name 'PowerShell 7' -Cmd 'pwsh'                   -WingetId 'Microsoft.PowerShell'        -Fallback ${function:Fallback-Pwsh})      -and $ok
+$ok = (Install-Tool -Name 'Git'          -Cmd 'git'                    -WingetId 'Git.Git'                     -Fallback ${function:Fallback-Git})       -and $ok
+$ok = (Install-Tool -Name 'Git LFS'      -Cmd 'git-lfs'                -WingetId 'GitHub.GitLFS'               -Fallback ${function:Fallback-GitLfs})    -and $ok
+$ok = (Install-Tool -Name 'AWS CLI v2'   -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'               -Fallback ${function:Fallback-AwsCli})    -and $ok
+$ok = (Install-Tool -Name 'SSM plugin'   -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin' -Fallback ${function:Fallback-Ssm})       -and $ok
+$ok = (Install-Tool -Name 'Helm'         -Cmd 'helm'                   -WingetId 'Helm.Helm'                   -Fallback ${function:Fallback-Helm})      -and $ok
+$ok = (Install-Tool -Name 'eksctl'       -Cmd 'eksctl'                 -WingetId $null                         -Fallback ${function:Fallback-Eksctl})    -and $ok
+$ok = (Install-Tool -Name 'Terraform'    -Cmd 'terraform'              -WingetId 'Hashicorp.Terraform'         -Fallback ${function:Fallback-Terraform}) -and $ok
+$ok = (Install-Tool -Name 'VS Code'      -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode'  -Fallback ${function:Fallback-VSCode})    -and $ok
+$ok = (Install-Tool -Name 'k9s'          -Cmd 'k9s'                    -WingetId 'Derailed.k9s'                -Fallback ${function:Fallback-K9s})       -and $ok
 
 # git-lfs 는 설치만으로는 git 에 훅되지 않음 → 시스템 전역으로 등록 (idempotent)
 if ((Test-Tool 'git') -and (Test-Tool 'git-lfs')) {
