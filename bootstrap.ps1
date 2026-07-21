@@ -1,4 +1,7 @@
-﻿#Requires -Version 5.1
+﻿# SPDX-License-Identifier: BSD-3-Clause
+# Copyright 2026 The ISHS Cloud Computing Authors
+
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     학교 실습실 Windows PC에 클라우드 컴퓨팅 실습용 도구를 자동 설치하는 부트스트랩 스크립트.

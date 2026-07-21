@@ -18,6 +18,10 @@
 | **VS Code** | 코드 편집기 |
 | **k9s** | Kubernetes 터미널 UI |
 
+## Maintainer
+
+- 성준혁 ([@zenru1023](https://github.com/zenru1023))
+
 ---
 
 ## 왜 kubectl만 특별 취급하나?
@@ -126,3 +130,7 @@ installer 가 PATH 를 등록한 직후라 현재 창에 반영되지 않았을 
 
 **Q. 실행이 스크립트 실행 정책 때문에 막힌다.**
 `-ExecutionPolicy Bypass` 를 붙여 실행한다 (위 예시 참고).
+
+## License
+
+This project is licensed under the [BSD 3-Clause License](LICENSE).
