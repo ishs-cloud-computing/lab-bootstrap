@@ -17,6 +17,8 @@
 | **VS Code** | 코드 편집기 |
 | **k9s** | Kubernetes 터미널 UI |
 
+여기까지가 모두가 공유하는 기본 설치다. 개인·과목별 추가 설정은 [커스텀](#커스텀)으로 얹는다.
+
 ## Maintainer
 
 - 성준혁 ([@zenru1023](https://github.com/zenru1023))
@@ -80,6 +82,8 @@ https://s3.us-west-2.amazonaws.com/amazon-eks/<버전>/<날짜>/bin/windows/amd6
 | `-InstallDir` | `C:\cloud-tools\bin` | 직접 다운로드한 portable 바이너리 배치 폴더 (시스템 PATH 에 자동 추가) |
 | `-NoWinget` | (off) | winget 을 건너뛰고 **모든 도구를 직접 다운로드**로 설치 |
 | `-Force` | (off) | 이미 설치돼 있어도 다시 설치 |
+| `-Custom` | (없음) | 설치 후 실행할 [커스텀](#커스텀) 이름. 쉼표로 여러 개 (`-Custom zenru,netlab`) |
+| `-BaseUrl` | GitHub raw `main` | `irm \| iex` 로 실행할 때 커스텀을 받아올 주소. 미러/포크에서만 지정 |
 
 예시:
 
@@ -93,11 +97,46 @@ pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1 -NoWinget
 
 ---
 
+## 커스텀
+
+기본 설치 위에 얹는 개인·과목별 설정이다. 각 커스텀은 [`customs/`](customs/) 안의 파일 하나다.
+
+| 이름 | 내용 | 문서 |
+|---|---|---|
+| `zenru` | 별칭 `g`/`k`/`tf` + 탭 자동완성 | [customs/zenru.md](customs/zenru.md) |
+
+```powershell
+# 커스텀 없이 (기본)
+irm https://wsc.zenru.net/bootstrap.ps1 | iex
+
+# 커스텀 적용 - irm | iex 는 인자를 못 받으므로 스크립트블록으로 감싼다
+& ([scriptblock]::Create((irm https://wsc.zenru.net/bootstrap.ps1))) -Custom zenru
+
+# 로컬 스크립트
+pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1 -Custom zenru
+```
+
+`-Custom` 은 **이름만** 받는다 (URL·경로 불가). 실행되는 코드는 이 저장소의 `customs/` 안에 있는
+것뿐이고, 커스텀은 관리자 권한으로 돌기 때문에 그 유입 경로를 PR 리뷰 하나로 좁혀둔 것이다.
+
+한 줄짜리 URL 로 배포하고 싶으면 Cloudflare Worker 에서 라우트 하나가
+아래 문자열을 반환하도록 하면 된다 (`irm https://wsc.zenru.net/zenru | iex`):
+
+```powershell
+& ([scriptblock]::Create((irm https://wsc.zenru.net/bootstrap.ps1))) -Custom zenru
+```
+
+**커스텀을 새로 만들려면** → [customs/README.md](customs/README.md)
+
+---
+
 ## 동작 특성
 
 - **Idempotent**: 이미 설치된 도구는 건너뛴다. 재부팅으로 초기화되는 실습 PC 에서 매 세션 다시 돌려도 안전하고, 재실행이 빠르다.
 - **로그**: 전체 실행 로그가 `%TEMP%\lab-bootstrap\bootstrap_<시각>.log` 에 저장된다.
 - **PATH**: `-InstallDir` 을 시스템 PATH 에 1회만 추가한다.
+- **profile.d**: pwsh 7 공용 프로필에 `C:\cloud-tools\profile.d\*.ps1` 로더를 1회만 등록한다.
+  이 폴더는 매 실행 비워지고 `-Custom` 으로 지정한 커스텀이 다시 채운다.
 
 ---
 
