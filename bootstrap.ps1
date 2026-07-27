@@ -27,18 +27,30 @@
 .PARAMETER Force
     Reinstall even if the tool is already present.
 
+.PARAMETER Custom
+    Names of customization scripts to run after the install, from customs/ in this repo.
+    Names only, never URLs: the repo (and its review) is the only way code gets in here.
+
+.PARAMETER BaseUrl
+    Where customs/ is fetched from when this script runs without a file on disk (irm | iex).
+
 .EXAMPLE
     pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1
 
 .EXAMPLE
     pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1 -KubectlMinor 1.31 -Force
+
+.EXAMPLE
+    pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1 -Custom zenru
 #>
 [CmdletBinding()]
 param(
     [string]$KubectlMinor = "1.36",
     [string]$InstallDir   = "C:\cloud-tools\bin",
     [switch]$NoWinget,
-    [switch]$Force
+    [switch]$Force,
+    [string[]]$Custom     = @(),
+    [string]$BaseUrl      = 'https://raw.githubusercontent.com/ishs-cloud-computing/lab-bootstrap/main'
 )
 
 # #Requires is ignored when this source is piped into iex, which is the documented one-liner.
@@ -73,6 +85,12 @@ $GitPinnedUrl    = 'https://github.com/git-for-windows/git/releases/download/v2.
 
 $EnvKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
 
+# Shell integration lands next to the binaries, not inside them: $InstallDir is on PATH and
+# profile scripts have no business being resolvable as commands. One directory, not one file:
+# several customs can each drop their own .ps1 without overwriting each other.
+$ToolsRoot = Split-Path $InstallDir -Parent
+$ProfileD  = Join-Path $ToolsRoot 'profile.d'
+
 # Logging
 function Write-Step { param([string]$Msg) Write-Host "`n==> $Msg" -ForegroundColor Cyan }
 function Write-Ok   { param([string]$Msg) Write-Host "    [OK]   $Msg" -ForegroundColor Green }
@@ -97,9 +115,12 @@ function Assert-Admin {
 
     $pwsh    = (Get-Process -Id $PID).Path
     $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"",
-                 '-KubectlMinor', $KubectlMinor, '-InstallDir', "`"$InstallDir`"")
+                 '-KubectlMinor', $KubectlMinor, '-InstallDir', "`"$InstallDir`"",
+                 '-BaseUrl', "`"$BaseUrl`"")
     if ($NoWinget) { $argList += '-NoWinget' }
     if ($Force)    { $argList += '-Force' }
+    # Forget this and the customs vanish silently when UAC hands over to the new process.
+    if ($Custom)   { $argList += @('-Custom', ($Custom -join ',')) }
 
     try {
         Start-Process -FilePath $pwsh -Verb RunAs -ArgumentList $argList
@@ -321,6 +342,110 @@ function Fallback-GitLfs {
     Add-SystemPath $InstallDir
 }
 
+# Extension points for customs/
+
+# Bake each tool's completion script to a file. Running the generators at shell startup instead
+# would cost 100-300ms per tool on every new terminal; this way the profile only dot-sources.
+function Write-ToolCompletion {
+    param([string]$Cmd, [string]$Alias)
+    if (-not (Test-Tool $Cmd)) { return }
+
+    # Same reason as Invoke-Verification: generators write hints to stderr, which EAP=Stop
+    # would report as failure. Function scope, so it is restored on return.
+    $ErrorActionPreference = 'Continue'
+    try {
+        $s = (& $Cmd completion powershell 2>$null | Out-String)
+        if ($LASTEXITCODE -ne 0 -or -not $s.Trim()) { throw "no completion output (exit $LASTEXITCODE)" }
+
+        # cobra writes "Completion ended with directive: ..." to stderr on every request, and its
+        # own '2>&1 | Out-Null' misses it: the redirection binds to Invoke-Expression, not to the
+        # native command inside the string it evaluates. Push it inside the string. No match
+        # (other generator, other version) just means the noise stays; completion still works.
+        $s = $s -replace '(?m)^(\s*Invoke-Expression\s+-OutVariable\s+out\s+"\$RequestComp)("\s*)2>&1', '$1 2>`$$null$2'
+
+        # The generated script registers the completer under the real command name only.
+        # Reuse its script block for the alias rather than regenerating anything.
+        if ($Alias) {
+            # cobra emits: Register-ArgumentCompleter -CommandName 'kubectl' -ScriptBlock ${__kubectlCompleterBlock}
+            if ($s -match "(?m)^Register-ArgumentCompleter\s+(?:-Native\s+)?-CommandName\s+'?$Cmd'?\s+-ScriptBlock\s+(\`$\{?\w+\}?)") {
+                $s += "`nRegister-ArgumentCompleter -CommandName '$Alias' -ScriptBlock $($Matches[1])`n"
+            } else {
+                Write-Warn "$Cmd : alias '$Alias' gets no completion (unexpected generator output)"
+            }
+        }
+
+        Set-Content -Path (Join-Path $ProfileD "$Cmd.ps1") -Value $s -Encoding UTF8
+        Write-Ok "$Cmd completion"
+    } catch {
+        Write-Warn "$Cmd completion skipped: $($_.Exception.Message)"
+    }
+}
+
+# The profile.d loader. Installed whether or not any custom runs: an empty directory loads fine,
+# and having it always present means a custom never has to touch the shared profile itself.
+function Install-ProfileHook {
+    Write-Step "profile.d"
+
+    try {
+        # Wiped on every run and refilled by whatever -Custom asks for. One rule to remember:
+        # what you pass is what is active. No leftovers from a custom you dropped.
+        if (Test-Path $ProfileD) { Remove-Item (Join-Path $ProfileD '*.ps1') -Force -ErrorAction SilentlyContinue }
+        New-Item -ItemType Directory -Path $ProfileD -Force | Out-Null
+
+        # Append one line; never rewrite the shared profile, it may not be ours.
+        $p    = $PROFILE.AllUsersAllHosts
+        $line = "Get-ChildItem '$ProfileD\*.ps1' -ErrorAction SilentlyContinue | ForEach-Object { . `$_.FullName }"
+        $cur  = if (Test-Path $p) { Get-Content $p -Raw } else { '' }
+        if ($cur -match [regex]::Escape($ProfileD)) {
+            Write-Skip "profile already hooked"
+        } else {
+            New-Item -ItemType Directory -Path (Split-Path $p -Parent) -Force | Out-Null
+            Add-Content -Path $p -Value "`n# lab-bootstrap`n$line`n" -Encoding UTF8
+            Write-Ok "hooked into $p"
+        }
+        return $true
+    } catch {
+        Write-Err $_.Exception.Message
+        return $false
+    }
+}
+
+# Run the requested customization scripts. They are dot-sourced, so they see every function and
+# variable above; customs/README.md documents which of those are meant to be used.
+function Invoke-Customs {
+    $allOk = $true
+    foreach ($name in $Custom) {
+        # A name, never a URL or a path. This is the trust boundary: code can only arrive here
+        # through the repo, which means through review. It also blocks '../../evil'.
+        if ($name -notmatch '^[a-z0-9][a-z0-9-]*$') {
+            Write-Err "invalid custom name: $name"
+            $allOk = $false
+            continue
+        }
+
+        Write-Step "custom: $name"
+        try {
+            # Local copy wins when running from a file: development, and USB drops on a lab PC
+            # where only the S3/GitHub endpoints are blocked.
+            $local = if ($PSScriptRoot) { Join-Path $PSScriptRoot "customs\$name.ps1" } else { $null }
+            if ($local -and (Test-Path $local)) {
+                Write-Ok "source $local"
+                . $local
+            } else {
+                $url = "$BaseUrl/customs/$name.ps1"
+                Write-Ok "source $url"
+                $src = Invoke-RestMethod -Uri $url -Headers @{ 'User-Agent' = 'lab-bootstrap' } -TimeoutSec 60
+                . ([scriptblock]::Create($src))
+            }
+        } catch {
+            # One bad custom must not take the toolchain install down with it.
+            Write-Err "custom '$name' failed: $($_.Exception.Message)"
+            $allOk = $false
+        }
+    }
+    return $allOk
+}
+
 # kubectl: EKS S3 mirror instead of the blocked dl.k8s.io
 function Install-Kubectl {
     Write-Step "kubectl (EKS S3 mirror)"
@@ -424,6 +549,8 @@ function Invoke-Verification {
     if ($ssh) { Write-Ok ("{0,-11} {1} ({2})" -f 'ssh-agent', $ssh.Status, $ssh.StartType) }
     else      { Write-Err ("{0,-11} service missing" -f 'ssh-agent') }
 
+    if ($Custom) { Write-Ok ("{0,-11} {1} (new terminal required)" -f 'customs', ($Custom -join ', ')) }
+
     Write-Host ""
     if ($fails.Count -eq 0) { Write-Host "All tools OK." -ForegroundColor Green }
     else { Write-Host ("Failed: {0}" -f ($fails -join ', ')) -ForegroundColor Red }
@@ -441,6 +568,7 @@ Start-Transcript -Path $log -Force | Out-Null
 $wingetState = if ($NoWinget) { 'off (-NoWinget)' } elseif (Test-Winget) { 'yes' } else { 'not found' }
 Write-Host "Cloud Lab Bootstrap   pwsh $($PSVersionTable.PSVersion)   kubectl $KubectlMinor   winget: $wingetState   force: $Force" -ForegroundColor Magenta
 Write-Host "  dir $InstallDir" -ForegroundColor DarkGray
+if ($Custom) { Write-Host "  custom $($Custom -join ', ')" -ForegroundColor DarkGray }
 Write-Host "  log $log" -ForegroundColor DarkGray
 
 if (-not (Test-Path $InstallDir)) { New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null }
@@ -469,8 +597,10 @@ if ((Test-Tool 'git') -and (Test-Tool 'git-lfs')) {
     }
 }
 
-$ok = (Install-Kubectl)  -and $ok
-$ok = (Enable-SshAgent)  -and $ok
+$ok = (Install-Kubectl)     -and $ok
+$ok = (Enable-SshAgent)     -and $ok
+$ok = (Install-ProfileHook) -and $ok
+$ok = (Invoke-Customs)      -and $ok   # last: customs decide based on what actually got installed
 
 Invoke-Verification
 

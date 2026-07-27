@@ -1,0 +1,5 @@
+# customs/ runs as Administrator on lab PCs. Review is the only control here,
+# so it must not be self-approvable. Requires branch protection with
+# "Require review from Code Owners" enabled to be enforced.
+/customs/       @zenru1023
+/bootstrap.ps1  @zenru1023
