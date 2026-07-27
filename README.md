@@ -6,7 +6,6 @@
 
 | 도구 | 용도 |
 |---|---|
-| **PowerShell 7** | 최신 PowerShell 셸 (`pwsh`) |
 | **Git** | 버전 관리 |
 | **Git LFS** | Git 대용량 파일 저장소 |
 | **AWS CLI v2** | AWS 명령행 도구 |
@@ -22,7 +21,37 @@
 
 - 성준혁 ([@zenru1023](https://github.com/zenru1023))
 
----
+## 시작하기
+
+### 요구 사항
+
+- [PowerShell 7](https://github.com/PowerShell/PowerShell/releases/latest)
+
+```powershell
+# winget으로 설치
+winget install --id Microsoft.PowerShell -e --source winget --accept-package-agreements --accept-source-agreements
+```
+
+### 설치
+
+```powershell
+# PowerShell 7에서 실행
+irm https://wsc.zenru.net/bootstrap.ps1 | irm
+
+# 또는 github 주소 사용
+irm https://raw.githubusercontent.com/ishs-cloud-computing/lab-bootstrap/main/bootstrap.ps1 | iex
+```
+
+로컬 스크립트 실행:
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1
+
+# 인자를 포함하여 실행
+pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1 -KubectlMinor 1.31
+```
+
+> 설치 직후에는 새 터미널을 하나 열어야 PATH 가 완전히 반영된다.
 
 ## 왜 kubectl만 특별 취급하나?
 
@@ -43,34 +72,6 @@ https://s3.us-west-2.amazonaws.com/amazon-eks/<버전>/<날짜>/bin/windows/amd6
 
 ---
 
-## 실행 방법
-
-> 관리자 권한이 필요하다. 관리자가 아니면 스크립트가 UAC 창을 띄워 자동으로 승격한다.
-
-### 1) 로컬 파일로 실행
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
-```
-
-### 2) 원라이너 (레포 raw URL, github.com 접근 가능 시)
-
-```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ishs-cloud-computing/lab-bootstrap/main/bootstrap.ps1).TrimStart([char]0xFEFF)))
-```
-
-> `irm ... | iex` 는 `param()` 블록이 있는 스크립트에서 실패한다(`iex` 가 param 토큰을 처리 못 함).
-> `.TrimStart([char]0xFEFF)` 는 `irm` 이 남기는 UTF-8 BOM 을 떼어낸다. 안 떼면 BOM 이 첫 구문으로 파싱돼
-> `param()` 이 스크립트 첫 구문이 아니게 되고 `[CmdletBinding()]` 줄에서 파싱 에러가 난다.
-> 파라미터를 넘기려면 뒤에 붙인다: `& ([scriptblock]::Create((irm <URL>).TrimStart([char]0xFEFF))) -KubectlMinor 1.31`
-
-실행이 끝나면 모든 도구의 버전을 실행해 **OK / FAIL 요약 표**를 출력한다.
-특히 `kubectl version --client` 결과가 `v1.32.x-eks-...` 처럼 `-eks-` 빌드 문자열이면 차단 우회 성공이다.
-
-> 설치 직후에는 새 터미널을 하나 열어야 PATH 가 완전히 반영된다.
-
----
-
 ## 파라미터
 
 | 파라미터 | 기본값 | 설명 |
@@ -84,10 +85,10 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
 
 ```powershell
 # EKS 클러스터가 1.31 이면
-powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 -KubectlMinor 1.31
+pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1 -KubectlMinor 1.31
 
 # winget 이 문제를 일으키면 전부 직접 다운로드로
-powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 -NoWinget
+pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1 -NoWinget
 ```
 
 ---
@@ -115,11 +116,37 @@ $KubectlMap = @{
 
 ---
 
+## 버전 pin 갱신
+
+winget 없이 직접 다운로드할 때 스크립트는 각 도구의 최신 버전을 온라인으로 조회한다.
+조회가 실패하면 `bootstrap.ps1` 상단의 **pin 값**을 쓴다.
+
+```powershell
+$HelmPinned      = "4.2.3"
+$TerraformPinned = "1.15.8"
+$GitLfsPinned    = "3.7.1"
+$GitPinnedUrl    = 'https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.3/Git-2.55.0.3-64-bit.exe'
+```
+
+이 pin 은 장식이 아니라 **실습실에서 실제로 자주 쓰인다**: 무인증 GitHub API 는 IP 당 시간당 60 요청이고
+실습실 전체가 학교 NAT 주소 하나를 공유하므로, PC 20 대가 동시에 돌리면 쿼터가 소진되어 이후 전부
+`403` 이 된다. 그때 pin 이 없으면 그 도구는 설치가 실패한다. 학기 시작 전에 한 번씩 갱신해두면 좋다.
+
+(Git for Windows 는 태그와 파일명의 버전 표기가 달라서 — `v2.55.0.windows.3` vs `Git-2.55.0.3-64-bit.exe` —
+버전 대신 URL 전체를 pin 한다.)
+
+---
+
 ## 문제 해결 (FAQ)
 
+**Q. `PowerShell 7+ is required` 오류가 난다.**
+Windows 기본 셸(Windows PowerShell 5.1)로 실행한 것이다. `powershell` 이 아니라 **`pwsh`** 로 실행한다.
+`pwsh` 명령 자체가 없으면 위 [선행 조건](#선행-조건-powershell-7) 섹션을 먼저 수행한다.
+
 **Q. winget 이 설치돼 있지 않다.**
-`-NoWinget` 없이 그냥 실행해도 winget 이 없으면 자동으로 직접 다운로드로 넘어간다.
-winget 을 쓰고 싶으면 Microsoft Store 에서 "앱 설치 관리자(App Installer)" 를 설치한다.
+스크립트 자체는 winget 이 없어도 자동으로 직접 다운로드로 넘어간다.
+다만 **선행 조건인 PowerShell 7 설치**가 먼저 막히므로, PowerShell 7 은 MSI 로 직접 설치하거나
+Microsoft Store 에서 "앱 설치 관리자(App Installer)" 를 먼저 설치한다.
 
 **Q. kubectl 설치에서 실패한다 (S3 도 막힌 경우).**
 드물지만 S3(`amazon-eks`) 까지 차단됐다면, 인터넷 되는 곳에서 위 S3 URL 로 `kubectl.exe` 를 미리 받아
@@ -129,7 +156,7 @@ USB 등으로 옮긴 뒤 `-InstallDir`(`C:\cloud-tools\bin`) 에 복사하면 �
 installer 가 PATH 를 등록한 직후라 현재 창에 반영되지 않았을 수 있다. **새 터미널**을 열어 다시 확인한다.
 
 **Q. 실행이 스크립트 실행 정책 때문에 막힌다.**
-`-ExecutionPolicy Bypass` 를 붙여 실행한다 (위 예시 참고).
+`pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1` 로 실행한다 (위 예시 참고).
 
 ## License
 
