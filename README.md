@@ -36,7 +36,7 @@ winget install --id Microsoft.PowerShell -e --source winget --accept-package-agr
 
 ```powershell
 # PowerShell 7에서 실행
-irm https://wsc.zenru.net/bootstrap.ps1 | irm
+irm https://wsc.zenru.net/bootstrap.ps1 | iex
 
 # 또는 github 주소 사용
 irm https://raw.githubusercontent.com/ishs-cloud-computing/lab-bootstrap/main/bootstrap.ps1 | iex
