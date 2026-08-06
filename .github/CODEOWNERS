@@ -1,5 +1,6 @@
-# customs/ runs as Administrator on lab PCs. Review is the only control here,
-# so it must not be self-approvable. Requires branch protection with
-# "Require review from Code Owners" enabled to be enforced.
-/customs/       @zenru1023
+# These run on lab PCs: bootstrap.ps1 and lib/ as Administrator, .bootrc in every pwsh session
+# on the machine. Review is the only control here, so they must not be self-approvable.
+# Requires branch protection with "Require review from Code Owners" enabled to be enforced.
 /bootstrap.ps1  @zenru1023
+/lib/           @zenru1023
+/.bootrc        @zenru1023
