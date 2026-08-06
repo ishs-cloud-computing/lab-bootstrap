@@ -21,7 +21,7 @@
 
 ## Maintainer
 
-- 성준혁 ([@zenru1023](https://github.com/zenru1023))
+- 성준혁 ([@jhyeok1023](https://github.com/jhyeok1023))
 
 ## 시작하기
 
@@ -34,7 +34,7 @@
 winget install --id Microsoft.PowerShell -e --source winget --accept-package-agreements --accept-source-agreements
 ```
 
-### 설치 — 저장소를 받아서 실행 (권장)
+### 설치
 
 ```powershell
 git clone https://github.com/ishs-cloud-computing/lab-bootstrap.git
@@ -45,28 +45,9 @@ pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1
 pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1 -KubectlMinor 1.31
 ```
 
-git 이 없으면 [ZIP 다운로드](https://github.com/ishs-cloud-computing/lab-bootstrap/archive/refs/heads/main.zip) 후
-압축을 풀고 그 폴더에서 실행해도 된다.
+또는 직접 다운로드:
 
-이 방법을 권장하는 이유가 셋이다:
-
-- 셸 설정 파일 [`.bootrc`](#bootrc) 가 같이 딸려온다. 원라이너에는 그게 없다.
-- 파일로 실행해야 **관리자 권한 자동 승격(UAC)** 이 동작한다. 원라이너는 이미 관리자로 연
-  pwsh 가 필요하다.
-- 설치 로직(`lib/*.ps1`)이 전부 로컬에 있어 네트워크를 타지 않는다.
-
-### 설치 — 원라이너 (도구만)
-
-```powershell
-# 관리자 권한 PowerShell 7 에서 실행
-irm https://wsc.zenru.net/bootstrap.ps1 | iex
-
-# 또는 github 주소 사용
-irm https://raw.githubusercontent.com/ishs-cloud-computing/lab-bootstrap/main/bootstrap.ps1 | iex
-```
-
-`lib/*.ps1` 은 `-BaseUrl` 에서 받아온다. 현재 폴더에 `.bootrc` 가 없으면 셸 설정은 건너뛰고
-**도구만** 설치된다.
+[ZIP 다운로드](https://github.com/ishs-cloud-computing/lab-bootstrap/archive/refs/heads/main.zip) 후
 
 > 설치 직후에는 새 터미널을 하나 열어야 PATH 와 셸 설정이 반영된다.
 
