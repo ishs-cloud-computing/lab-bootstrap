@@ -25,10 +25,14 @@
 ### 요구 사항
 
 - [PowerShell 7](https://github.com/PowerShell/PowerShell/releases/latest)
+- [Git](https://git-scm.com/)
 
 ```powershell
-# winget으로 설치
+# PowerShell 7 설치
 winget install --id Microsoft.PowerShell -e --source winget --accept-package-agreements --accept-source-agreements
+
+# Git 설치
+winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements
 ```
 
 ### 설치
