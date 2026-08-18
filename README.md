@@ -46,6 +46,15 @@ pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1
 pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1 -KubectlMinor 1.31
 ```
 
+
+#### GitLab 미러를 통해 설치
+
+```powershell
+git clone https://gitlab.com/ishs-cloud/lab-bootstrap.git
+cd lab-bootstrap
+pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1
+```
+
 > 설치 직후에는 새 터미널을 하나 열어야 PATH 와 셸 설정이 반영된다.
 
 ZIP 다운로드, 설치 확인 방법은 [Getting Started](https://github.com/ishs-cloud-computing/lab-bootstrap/wiki/Getting-Started) 를 본다.
