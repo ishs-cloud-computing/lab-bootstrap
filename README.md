@@ -55,6 +55,9 @@ pwsh -ExecutionPolicy Bypass -File .\bootstrap.ps1
 
 > 설치 직후에는 새 터미널을 하나 열어야 PATH 와 셸 설정이 반영된다.
 
+같은 명령을 다시 실행하면 최신화된다. 이미 깔린 도구는 버전을 확인해서 뒤처진 것만 올리고,
+최신이면 `[SKIP] up to date` 로 넘어간다. 전부 다시 받으려면 `-Force` 를 준다.
+
 ZIP 다운로드, 설치 확인 방법은 [Getting Started](https://github.com/ishs-cloud-computing/lab-bootstrap/wiki/Getting-Started) 를 본다.
 
 ## 문서

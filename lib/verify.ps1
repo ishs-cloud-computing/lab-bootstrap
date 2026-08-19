@@ -14,15 +14,18 @@ function Invoke-Verification {
 
     Write-Step "Verify"
     Sync-Path
+    # No Args column: Get-VersionArgs (lib/tools.ps1) holds them, and the update check reads
+    # the same function. Two copies would eventually disagree about one tool and only the
+    # summary would look right.
     $checks = @(
-        @{ Name = 'AWS CLI';    Cmd = 'aws';                    Args = @('--version') }
-        @{ Name = 'SSM plugin'; Cmd = 'session-manager-plugin'; Args = @('--version') }
-        @{ Name = 'Helm';       Cmd = 'helm';                   Args = @('version','--short') }
-        @{ Name = 'eksctl';     Cmd = 'eksctl';                 Args = @('version') }
-        @{ Name = 'kubectl';    Cmd = 'kubectl';                Args = @('version','--client') }
-        @{ Name = 'Terraform';  Cmd = 'terraform';              Args = @('version') }
-        @{ Name = 'VS Code';    Cmd = 'code';                   Args = @('--version') }
-        @{ Name = 'k9s';        Cmd = 'k9s';                    Args = @('version','-s') }
+        @{ Name = 'AWS CLI';    Cmd = 'aws' }
+        @{ Name = 'SSM plugin'; Cmd = 'session-manager-plugin' }
+        @{ Name = 'Helm';       Cmd = 'helm' }
+        @{ Name = 'eksctl';     Cmd = 'eksctl' }
+        @{ Name = 'kubectl';    Cmd = 'kubectl' }
+        @{ Name = 'Terraform';  Cmd = 'terraform' }
+        @{ Name = 'VS Code';    Cmd = 'code' }
+        @{ Name = 'k9s';        Cmd = 'k9s' }
     )
     $fails = @()
     foreach ($c in $checks) {
@@ -32,7 +35,7 @@ function Invoke-Verification {
             continue
         }
         try {
-            $out = (& $c.Cmd @($c.Args) 2>&1 | Select-Object -First 1) -join ' '
+            $out = (& $c.Cmd @(Get-VersionArgs $c.Cmd) 2>&1 | Select-Object -First 1) -join ' '
             Write-Ok ("{0,-11} {1}" -f $c.Name, $out)
         } catch {
             Write-Err ("{0,-11} version check failed" -f $c.Name)
