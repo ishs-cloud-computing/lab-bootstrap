@@ -6,7 +6,7 @@
 # changes something. The version pins themselves stay in bootstrap.ps1 - they are course policy,
 # not implementation, and README points maintainers at that one file.
 # Provided by the loader: $InstallDir $KubectlMap $KubectlMinor $Force
-#                         $HelmPinned $TerraformPinned $GitLfsPinned $GitPinnedUrl
+#                         $HelmPinned $TerraformPinned
 # Definitions only - no top-level code, so load order never matters.
 
 # Direct download per tool
@@ -67,29 +67,6 @@ function Fallback-K9s {
     $zip = Join-Path $env:TEMP 'k9s.zip'
     Get-Download 'https://github.com/derailed/k9s/releases/latest/download/k9s_Windows_amd64.zip' $zip
     Expand-ToInstallDir -Zip $zip -ExeName 'k9s.exe'
-    Remove-Item $zip -Force -ErrorAction SilentlyContinue
-    Add-SystemPath $InstallDir
-}
-
-function Fallback-Git {
-    $url = $GitPinnedUrl
-    try {
-        $rel   = Invoke-RestMethod -Uri 'https://api.github.com/repos/git-for-windows/git/releases/latest' `
-                                   -Headers @{ 'User-Agent' = 'lab-bootstrap' } -TimeoutSec 30
-        $asset = $rel.assets | Where-Object { $_.name -like 'Git-*-64-bit.exe' } | Select-Object -First 1
-        if ($asset) { $url = $asset.browser_download_url }
-    } catch { Write-Warn "Git lookup failed, using pinned URL" }
-    $exe = Join-Path $env:TEMP (Split-Path $url -Leaf)
-    Get-Download $url $exe
-    Start-Process $exe -ArgumentList '/VERYSILENT','/NORESTART','/NOCANCEL','/SP-' -Wait
-    Remove-Item $exe -Force -ErrorAction SilentlyContinue
-}
-
-function Fallback-GitLfs {
-    $ver = Get-LatestOrPinned -Repo 'git-lfs/git-lfs' -Pinned $GitLfsPinned -Label 'Git LFS'
-    $zip = Join-Path $env:TEMP 'git-lfs.zip'
-    Get-Download "https://github.com/git-lfs/git-lfs/releases/download/v$ver/git-lfs-windows-amd64-v$ver.zip" $zip
-    Expand-ToInstallDir -Zip $zip -ExeName 'git-lfs.exe'
     Remove-Item $zip -Force -ErrorAction SilentlyContinue
     Add-SystemPath $InstallDir
 }

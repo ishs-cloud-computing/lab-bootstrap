@@ -26,8 +26,8 @@ function Install-Winget {
 }
 
 # Install one tool: winget, then the fallback scriptblock.
-# -Fallback stays a scriptblock rather than a data table because Terraform, Git and kubectl each
-# resolve their download differently; nine functions named after nine tools is the greppable form.
+# -Fallback stays a scriptblock rather than a data table because Terraform and kubectl each
+# resolve their download differently; seven functions named after seven tools is the greppable form.
 function Install-Tool {
     param(
         [string]$Name,

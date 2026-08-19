@@ -15,8 +15,6 @@ function Invoke-Verification {
     Write-Step "Verify"
     Sync-Path
     $checks = @(
-        @{ Name = 'Git';        Cmd = 'git';                    Args = @('--version') }
-        @{ Name = 'Git LFS';    Cmd = 'git-lfs';                Args = @('version') }
         @{ Name = 'AWS CLI';    Cmd = 'aws';                    Args = @('--version') }
         @{ Name = 'SSM plugin'; Cmd = 'session-manager-plugin'; Args = @('--version') }
         @{ Name = 'Helm';       Cmd = 'helm';                   Args = @('version','--short') }

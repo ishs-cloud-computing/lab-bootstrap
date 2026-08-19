@@ -7,8 +7,8 @@
     Installs the cloud computing lab toolchain on a school lab Windows PC.
 
 .DESCRIPTION
-    Installs Git, Git LFS, AWS CLI v2, SSM plugin, Helm, eksctl, kubectl, Terraform,
-    VS Code and k9s. winget first, direct download from each vendor as fallback.
+    Installs AWS CLI v2, SSM plugin, Helm, eksctl, kubectl, Terraform, VS Code and k9s.
+    winget first, direct download from each vendor as fallback.
     Idempotent: already-installed tools are skipped. Needs admin; self-elevates via UAC.
 
     kubectl is the exception: dl.k8s.io is blocked by the school firewall (and the
@@ -77,10 +77,6 @@ $KubectlMap = @{
 # GitHub quota is 60/hour per IP and the whole lab shares one NAT address, so these get hit.
 $HelmPinned      = "4.2.3"
 $TerraformPinned = "1.15.8"
-$GitLfsPinned    = "3.7.1"
-# Git for Windows tags and asset names carry different versions (v2.55.0.windows.3 vs
-# Git-2.55.0.3-64-bit.exe), so pin the URL rather than a version.
-$GitPinnedUrl    = 'https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.3/Git-2.55.0.3-64-bit.exe'
 
 $EnvKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
 
@@ -180,8 +176,6 @@ Add-SystemPath $InstallDir
 
 # Install calls stay on the left of -and so they always run (no short-circuit).
 $ok = $true
-$ok = (Install-Tool -Name 'Git'          -Cmd 'git'                    -WingetId 'Git.Git'                     -Fallback ${function:Fallback-Git})       -and $ok
-$ok = (Install-Tool -Name 'Git LFS'      -Cmd 'git-lfs'                -WingetId 'GitHub.GitLFS'               -Fallback ${function:Fallback-GitLfs})    -and $ok
 $ok = (Install-Tool -Name 'AWS CLI v2'   -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'               -Fallback ${function:Fallback-AwsCli})    -and $ok
 $ok = (Install-Tool -Name 'SSM plugin'   -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin' -Fallback ${function:Fallback-Ssm})       -and $ok
 $ok = (Install-Tool -Name 'Helm'         -Cmd 'helm'                   -WingetId 'Helm.Helm'                   -Fallback ${function:Fallback-Helm})      -and $ok
