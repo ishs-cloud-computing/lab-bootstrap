@@ -190,6 +190,47 @@ lua pcall(function() require('mini.basics').setup(); require('mini.statusline').
     }
 }
 
+# VS Code extras: the HashiCorp Terraform extension, and workspace trust off so 'code .'
+# never prompts per folder. Both are per-user state, so they land on whoever ran bootstrap.
+function Install-VSCodeConfig {
+    Write-Step "VS Code config"
+
+    try {
+        if (-not (Test-Tool 'code')) { Write-Skip "code not installed"; return $true }
+
+        # code.cmd writes noise to stderr, so judge by exit code in a Continue scope.
+        $extOk = & {
+            $ErrorActionPreference = 'Continue'
+            code --install-extension hashicorp.terraform --force 2>&1 | Out-Null
+            $LASTEXITCODE -eq 0
+        }
+        if ($extOk) { Write-Ok "extension hashicorp.terraform" }
+        else { Write-Err "extension install failed - marketplace blocked?" }
+
+        # Merge, never clobber: settings.json is user state. VS Code tolerates comments in it
+        # (JSONC) but ConvertFrom-Json does not; a file we cannot parse we leave alone.
+        $file = Join-Path $env:APPDATA 'Code\User\settings.json'
+        New-Item -ItemType Directory -Path (Split-Path $file -Parent) -Force | Out-Null
+        $cfg = @{}
+        if (Test-Path $file) {
+            try { $cfg = Get-Content $file -Raw | ConvertFrom-Json -AsHashtable }
+            catch { Write-Warn "settings.json has comments or is invalid - trust setting skipped"; return $extOk }
+            if ($null -eq $cfg) { $cfg = @{} }
+        }
+        if ($cfg['security.workspace.trust.enabled'] -eq $false) {
+            Write-Skip "workspace trust already off"
+        } else {
+            $cfg['security.workspace.trust.enabled'] = $false
+            $cfg | ConvertTo-Json -Depth 32 | Set-Content -Path $file -Encoding UTF8
+            Write-Ok "workspace trust prompt off"
+        }
+        return $extOk
+    } catch {
+        Write-Err $_.Exception.Message
+        return $false
+    }
+}
+
 # kubectl: EKS S3 mirror instead of the blocked dl.k8s.io
 function Install-Kubectl {
     Write-Step "kubectl (EKS S3 mirror)"

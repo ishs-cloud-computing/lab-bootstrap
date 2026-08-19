@@ -190,6 +190,7 @@ $ok = (Install-Tool -Name 'zoxide'       -Cmd 'zoxide'                 -WingetId
 $ok = (Install-Tool -Name 'Mark (mdv)'   -Cmd 'mdv'                    -WingetId $null                         -Direct   ${function:Direct-Mark})      -and $ok
 $ok = (Install-Tool -Name 'Neovim'       -Cmd 'nvim'                   -WingetId 'Neovim.Neovim'               -Direct   ${function:Direct-Neovim})    -and $ok
 $ok = (Install-MiniNvim)                 -and $ok   # after Neovim: plugs into its runtime tree
+$ok = (Install-VSCodeConfig)             -and $ok   # after VS Code: Terraform extension + trust off
 
 # Installing git-lfs does not hook it into git. Own scope with EAP=Continue because git
 # writes hints to stderr and can return non-zero while succeeding, so judge by exit code.
