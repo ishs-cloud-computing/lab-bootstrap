@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Neither job writes anything back, and an org-wide read-only default is fine for both.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Installed as a plain step rather than a marketplace action, so an org that allow-lists
+      # actions only has to permit GitHub's own.
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -ErrorAction Stop
+
+      # Parses bootstrap.ps1, .bootrc and lib/*.ps1, then checks what the loader cannot check
+      # about itself: the lib marker version, the $LibFiles list, and every ${function:...}
+      # reference. pwsh ships on the runner image.
+      - name: Lint
+        shell: pwsh
+        run: ./test/lint.ps1
+
+  units:
+    name: unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Drives the real lib/*.ps1 against stub tools. No Windows, no winget, no download - see
+      # the header of test/units.ps1 for what that does and does not prove.
+      - name: Unit tests
+        shell: pwsh
+        run: ./test/units.ps1

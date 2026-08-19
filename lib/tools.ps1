@@ -47,13 +47,15 @@ function Latest-K9s {
 # HashiCorp is not on GitHub releases for this; checkpoint is the documented endpoint.
 function Latest-Terraform {
     param([string]$Have)
+    $pin = if ($Have) { $Have } else { $TerraformPinned }
     try {
         $c = Invoke-RestMethod -Uri 'https://checkpoint-api.hashicorp.com/v1/check/terraform' `
                                -Headers @{ 'User-Agent' = 'lab-bootstrap' } -TimeoutSec 30
         if ($c.current_version) { return $c.current_version }
-    } catch { }
-    $pin = if ($Have) { $Have } else { $TerraformPinned }
-    Write-Warn "Terraform lookup failed, using $pin"
+        Write-Warn "Terraform lookup returned no version, using $pin"
+    } catch {
+        Write-Warn "Terraform lookup failed, using $pin ($($_.Exception.Message))"
+    }
     return $pin
 }
 
