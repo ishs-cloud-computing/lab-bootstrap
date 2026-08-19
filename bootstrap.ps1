@@ -9,7 +9,8 @@
 .DESCRIPTION
     Installs AWS CLI v2, SSM plugin, Helm, eksctl, kubectl, Terraform, VS Code and k9s.
     winget first, direct download from each vendor as fallback.
-    Idempotent: already-installed tools are skipped. Needs admin; self-elevates via UAC.
+    Re-runnable: an already-installed tool is version-checked and updated only if it is behind.
+    Needs admin; self-elevates via UAC.
 
     kubectl is the exception: dl.k8s.io is blocked by the school firewall (and the
     winget/choco packages download from there too), so it comes from the Amazon EKS S3
@@ -32,7 +33,7 @@
     Skip winget; install everything by direct download.
 
 .PARAMETER Force
-    Reinstall even if the tool is already present.
+    Reinstall even if the tool is already present and current.
 
 .PARAMETER BaseUrl
     Where lib/*.ps1 is fetched from when this script runs without a file on disk (irm | iex).
@@ -174,18 +175,19 @@ Write-Host "  log $log"
 if (-not (Test-Path $InstallDir)) { New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null }
 Add-SystemPath $InstallDir
 
+# Order is cheapest-and-most-likely-to-fail first. A missing OpenSSH Client or a blocked EKS
+# mirror is what actually stops a lab PC, and finding out after ten minutes of VS Code download
+# is ten minutes wasted on every machine in the room.
 # Install calls stay on the left of -and so they always run (no short-circuit).
 $ok = $true
-$ok = (Install-Tool -Name 'AWS CLI v2'   -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'               -Fallback ${function:Fallback-AwsCli})    -and $ok
-$ok = (Install-Tool -Name 'SSM plugin'   -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin' -Fallback ${function:Fallback-Ssm})       -and $ok
-$ok = (Install-Tool -Name 'Helm'         -Cmd 'helm'                   -WingetId 'Helm.Helm'                   -Fallback ${function:Fallback-Helm})      -and $ok
-$ok = (Install-Tool -Name 'eksctl'       -Cmd 'eksctl'                 -WingetId $null                         -Fallback ${function:Fallback-Eksctl})    -and $ok
-$ok = (Install-Tool -Name 'Terraform'    -Cmd 'terraform'              -WingetId 'Hashicorp.Terraform'         -Fallback ${function:Fallback-Terraform}) -and $ok
-$ok = (Install-Tool -Name 'VS Code'      -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode'  -Fallback ${function:Fallback-VSCode})    -and $ok
-$ok = (Install-Tool -Name 'k9s'          -Cmd 'k9s'                    -WingetId 'Derailed.k9s'                -Fallback ${function:Fallback-K9s})       -and $ok
 
-# Installing git-lfs does not hook it into git. Own scope with EAP=Continue because git
-# writes hints to stderr and can return non-zero while succeeding, so judge by exit code.
+# Local and instant, no network at all.
+$ok = (Enable-SshAgent) -and $ok
+
+# Installing git-lfs does not hook it into git. We no longer install git or git-lfs, so this
+# only fires on the lab image's own copies - which is the point: the repos for this course use
+# LFS and the documented install path is 'git clone'. Own scope with EAP=Continue because git writes hints to
+# stderr and can return non-zero while succeeding, so judge by exit code.
 if ((Test-Tool 'git') -and (Test-Tool 'git-lfs')) {
     & {
         $ErrorActionPreference = 'Continue'
@@ -195,8 +197,20 @@ if ((Test-Tool 'git') -and (Test-Tool 'git-lfs')) {
     }
 }
 
-$ok = (Install-Kubectl)      -and $ok
-$ok = (Enable-SshAgent)      -and $ok
+# First of the downloads: dl.k8s.io is already blocked here, so the S3 mirror is the likeliest
+# thing to be blocked next, and the version is pinned so it costs no lookup to check.
+$ok = (Install-Kubectl) -and $ok
+
+$ok = (Install-Tool -Name 'AWS CLI v2'   -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'               -Fallback ${function:Fallback-AwsCli})    -and $ok
+$ok = (Install-Tool -Name 'SSM plugin'   -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin' -Fallback ${function:Fallback-Ssm})       -and $ok
+$ok = (Install-Tool -Name 'eksctl'       -Cmd 'eksctl'                 -WingetId $null                         -Fallback ${function:Fallback-Eksctl}    -Latest ${function:Latest-Eksctl})    -and $ok
+$ok = (Install-Tool -Name 'Helm'         -Cmd 'helm'                   -WingetId 'Helm.Helm'                   -Fallback ${function:Fallback-Helm}      -Latest ${function:Latest-Helm})      -and $ok
+$ok = (Install-Tool -Name 'Terraform'    -Cmd 'terraform'              -WingetId 'Hashicorp.Terraform'         -Fallback ${function:Fallback-Terraform} -Latest ${function:Latest-Terraform}) -and $ok
+
+# Biggest downloads last: nothing else waits on them.
+$ok = (Install-Tool -Name 'k9s'          -Cmd 'k9s'                    -WingetId 'Derailed.k9s'                -Fallback ${function:Fallback-K9s}       -Latest ${function:Latest-K9s})       -and $ok
+$ok = (Install-Tool -Name 'VS Code'      -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode'  -Fallback ${function:Fallback-VSCode})    -and $ok
+
 $ok = (Install-Completions)  -and $ok   # after the tools: bakes only what actually got installed
 $ok = (Install-BootRc)       -and $ok   # last: the block dot-sources what Install-Completions wrote
 
