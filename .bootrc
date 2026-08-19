@@ -4,9 +4,10 @@
 # the installer; it runs in every new pwsh session, like a profile, because it becomes one.
 # Edit freely and re-run bootstrap.ps1 to apply. Plain PowerShell, no special syntax.
 
-Set-Alias g  git
-Set-Alias k  kubectl
-Set-Alias tf terraform
+Set-Alias g   git
+Set-Alias k   kubectl
+Set-Alias tf  terraform
+Set-Alias vim nvim
 
 # Tab completion for kubectl / helm / eksctl / k9s is generated at install time and loaded
 # after this file, so the aliases above pick it up automatically. Nothing to do here.
@@ -27,3 +28,10 @@ Register-ArgumentCompleter -Native -CommandName terraform,tf -ScriptBlock {
 
 # git completion is deliberately absent: doing it properly needs posh-git from the PSGallery,
 # and one more dependency on the lab network is not worth it.
+
+# zoxide: the binary alone does nothing - init has to run in the profile. --cmd cd replaces
+# cd itself (cd = smart jump, cdi = interactive), so no separate 'z' to teach.
+# Guarded so a PC where the zoxide install failed still gets a quiet shell.
+if (Get-Command zoxide -ErrorAction SilentlyContinue) {
+    Invoke-Expression (& { (zoxide init powershell --cmd cd | Out-String) })
+}

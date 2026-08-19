@@ -25,33 +25,34 @@ function Install-Winget {
     return (Test-Tool $Cmd)
 }
 
-# Install one tool: winget, then the fallback scriptblock.
-# -Fallback stays a scriptblock rather than a data table because Terraform and kubectl each
-# resolve their download differently; seven functions named after seven tools is the greppable form.
+# Install one tool: direct vendor download first (winget's source update and metadata cost
+# 2-5 minutes across a fresh install), winget as the fallback when the download fails.
+# -Direct stays a scriptblock rather than a data table because Terraform and kubectl each
+# resolve their download differently; functions named after the tools is the greppable form.
 function Install-Tool {
     param(
         [string]$Name,
         [string]$Cmd,
-        [string]$WingetId,       # $null skips winget entirely
-        [scriptblock]$Fallback
+        [string]$WingetId,       # $null means no winget fallback exists
+        [scriptblock]$Direct
     )
     Write-Step "$Name"
 
     if (-not $Force -and (Test-Tool $Cmd)) { Write-Skip "already installed"; return $true }
 
-    if ($WingetId -and (Test-Winget)) {
-        if (Install-Winget -Id $WingetId -Cmd $Cmd) { Write-Ok "installed (winget)"; return $true }
-        Write-Warn "winget failed, trying direct download"
-    }
-
     try {
-        & $Fallback
+        & $Direct
         Sync-Path
         if (Test-Tool $Cmd) { Write-Ok "installed (download)"; return $true }
-        Write-Err "installed but '$Cmd' is not on PATH"
-        return $false
+        Write-Warn "installed but '$Cmd' is not on PATH"
     } catch {
-        Write-Err $_.Exception.Message
-        return $false
+        Write-Warn "direct download failed: $($_.Exception.Message)"
     }
+
+    if ($WingetId -and (Test-Winget)) {
+        if (Install-Winget -Id $WingetId -Cmd $Cmd) { Write-Ok "installed (winget fallback)"; return $true }
+    }
+
+    Write-Err "direct download failed$(if ($WingetId) { ', winget fallback too' })"
+    return $false
 }

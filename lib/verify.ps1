@@ -23,6 +23,8 @@ function Invoke-Verification {
         @{ Name = 'Terraform';  Cmd = 'terraform';              Args = @('version') }
         @{ Name = 'VS Code';    Cmd = 'code';                   Args = @('--version') }
         @{ Name = 'k9s';        Cmd = 'k9s';                    Args = @('version','-s') }
+        @{ Name = 'zoxide';     Cmd = 'zoxide';                 Args = @('--version') }
+        @{ Name = 'Neovim';     Cmd = 'nvim';                   Args = @('--version') }
     )
     $fails = @()
     foreach ($c in $checks) {
@@ -39,6 +41,10 @@ function Invoke-Verification {
             $fails += $c.Name
         }
     }
+
+    # mdv is our launcher .cmd, not a versioned binary, so 'on PATH' is the whole check.
+    if (Test-Tool 'mdv') { Write-Ok ("{0,-11} launcher on PATH" -f 'mdv') }
+    else { Write-Err ("{0,-11} not on PATH" -f 'mdv'); $fails += 'mdv' }
 
     $ssh = Get-Service -Name 'ssh-agent' -ErrorAction SilentlyContinue
     if ($ssh) { Write-Ok ("{0,-11} {1} ({2})" -f 'ssh-agent', $ssh.Status, $ssh.StartType) }

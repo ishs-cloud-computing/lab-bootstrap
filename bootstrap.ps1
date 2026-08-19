@@ -7,8 +7,10 @@
     Installs the cloud computing lab toolchain on a school lab Windows PC.
 
 .DESCRIPTION
-    Installs AWS CLI v2, SSM plugin, Helm, eksctl, kubectl, Terraform, VS Code and k9s.
-    winget first, direct download from each vendor as fallback.
+    Installs AWS CLI v2, SSM plugin, Helm, eksctl, kubectl, Terraform, VS Code, k9s,
+    zoxide, Mark (with an mdv launcher command) and Neovim with mini.nvim.
+    Direct download from each vendor first (no winget metadata overhead, 2-5 min faster on a
+    fresh PC); winget as the fallback when a vendor download fails.
     Idempotent: already-installed tools are skipped. Needs admin; self-elevates via UAC.
 
     kubectl is the exception: dl.k8s.io is blocked by the school firewall (and the
@@ -29,7 +31,7 @@
     Where portable binaries go. Added to the system PATH.
 
 .PARAMETER NoWinget
-    Skip winget; install everything by direct download.
+    Disable the winget fallback; direct download only.
 
 .PARAMETER Force
     Reinstall even if the tool is already present.
@@ -77,6 +79,7 @@ $KubectlMap = @{
 # GitHub quota is 60/hour per IP and the whole lab shares one NAT address, so these get hit.
 $HelmPinned      = "4.2.3"
 $TerraformPinned = "1.15.8"
+$ZoxidePinned    = "0.10.0"
 
 $EnvKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
 
@@ -156,7 +159,7 @@ foreach ($n in $LibFiles) {
     $libs[$n] = $lib
 }
 # Script scope on purpose: dot-sourcing inside a function would put every definition in that
-# function's scope, and the Fallback-* scriptblocks would lose sight of $InstallDir and the pins.
+# function's scope, and the Direct-* scriptblocks would lose sight of $InstallDir and the pins.
 foreach ($n in $LibFiles) { . ([scriptblock]::Create($libs[$n].Text)) }
 
 # Main
@@ -176,13 +179,17 @@ Add-SystemPath $InstallDir
 
 # Install calls stay on the left of -and so they always run (no short-circuit).
 $ok = $true
-$ok = (Install-Tool -Name 'AWS CLI v2'   -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'               -Fallback ${function:Fallback-AwsCli})    -and $ok
-$ok = (Install-Tool -Name 'SSM plugin'   -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin' -Fallback ${function:Fallback-Ssm})       -and $ok
-$ok = (Install-Tool -Name 'Helm'         -Cmd 'helm'                   -WingetId 'Helm.Helm'                   -Fallback ${function:Fallback-Helm})      -and $ok
-$ok = (Install-Tool -Name 'eksctl'       -Cmd 'eksctl'                 -WingetId $null                         -Fallback ${function:Fallback-Eksctl})    -and $ok
-$ok = (Install-Tool -Name 'Terraform'    -Cmd 'terraform'              -WingetId 'Hashicorp.Terraform'         -Fallback ${function:Fallback-Terraform}) -and $ok
-$ok = (Install-Tool -Name 'VS Code'      -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode'  -Fallback ${function:Fallback-VSCode})    -and $ok
-$ok = (Install-Tool -Name 'k9s'          -Cmd 'k9s'                    -WingetId 'Derailed.k9s'                -Fallback ${function:Fallback-K9s})       -and $ok
+$ok = (Install-Tool -Name 'AWS CLI v2'   -Cmd 'aws'                    -WingetId 'Amazon.AWSCLI'               -Direct   ${function:Direct-AwsCli})    -and $ok
+$ok = (Install-Tool -Name 'SSM plugin'   -Cmd 'session-manager-plugin' -WingetId 'Amazon.SessionManagerPlugin' -Direct   ${function:Direct-Ssm})       -and $ok
+$ok = (Install-Tool -Name 'Helm'         -Cmd 'helm'                   -WingetId 'Helm.Helm'                   -Direct   ${function:Direct-Helm})      -and $ok
+$ok = (Install-Tool -Name 'eksctl'       -Cmd 'eksctl'                 -WingetId $null                         -Direct   ${function:Direct-Eksctl})    -and $ok
+$ok = (Install-Tool -Name 'Terraform'    -Cmd 'terraform'              -WingetId 'Hashicorp.Terraform'         -Direct   ${function:Direct-Terraform}) -and $ok
+$ok = (Install-Tool -Name 'VS Code'      -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode'  -Direct   ${function:Direct-VSCode})    -and $ok
+$ok = (Install-Tool -Name 'k9s'          -Cmd 'k9s'                    -WingetId 'Derailed.k9s'                -Direct   ${function:Direct-K9s})       -and $ok
+$ok = (Install-Tool -Name 'zoxide'       -Cmd 'zoxide'                 -WingetId 'ajeetdsouza.zoxide'          -Direct   ${function:Direct-Zoxide})    -and $ok
+$ok = (Install-Tool -Name 'Mark (mdv)'   -Cmd 'mdv'                    -WingetId $null                         -Direct   ${function:Direct-Mark})      -and $ok
+$ok = (Install-Tool -Name 'Neovim'       -Cmd 'nvim'                   -WingetId 'Neovim.Neovim'               -Direct   ${function:Direct-Neovim})    -and $ok
+$ok = (Install-MiniNvim)                 -and $ok   # after Neovim: plugs into its runtime tree
 
 # Installing git-lfs does not hook it into git. Own scope with EAP=Continue because git
 # writes hints to stderr and can return non-zero while succeeding, so judge by exit code.
