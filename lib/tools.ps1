@@ -82,44 +82,6 @@ function Direct-Zoxide {
     Add-SystemPath $InstallDir
 }
 
-# Mydoo Viewer is a GUI app (more than one exe, so not into $InstallDir) and 'mdv' is our
-# own launcher: a .cmd in $InstallDir handing the path - file or directory, Mydoo opens
-# both - to the viewer exe. Install-Tool probes 'mdv', which only exists once this wrote it,
-# so idempotence works the same as for real binaries.
-function Direct-Mydoo {
-    $setup = Join-Path $env:TEMP 'mydoo-viewer-setup.exe'
-    Get-Download 'https://github.com/rladnwls122/mydoo-viewer-cli/releases/latest/download/mydoo-viewer-setup.exe' $setup
-
-    # /D= pins the install dir so mdv.cmd gets one path that exists for every account; the
-    # installer default is the elevated admin's %LOCALAPPDATA%, invisible to students.
-    # NSIS rule: /D must be the last argument and unquoted, so a $ToolsRoot with spaces would
-    # break it - the default C:\cloud-tools has none.
-    $dest = Join-Path $ToolsRoot 'MydooViewer'
-    Start-Process $setup -ArgumentList '/S', "/D=$dest" -Wait
-    Remove-Item $setup -Force -ErrorAction SilentlyContinue
-
-    # Bake the found path into mdv.cmd so the launcher never has to guess at run time.
-    # The bundle also ships uninstall.exe and the mydoo-parser sidecar - skip those.
-    $exe = Get-ChildItem -Path $dest -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -notmatch '^(uninstall|mydoo-parser)' } | Select-Object -First 1
-    if (-not $exe) { throw "viewer exe not found after silent install" }
-
-    # 'if exist' in cmd accepts files and directories alike, so no file-only check.
-    @"
-@echo off
-if "%~1"=="" (
-    echo Usage: mdv [Path]
-    exit /b 1
-)
-if not exist "%~1" (
-    echo mdv: path not found: %~1
-    exit /b 1
-)
-start "" "$($exe.FullName)" "%~1"
-"@ | Set-Content -Path (Join-Path $InstallDir 'mdv.cmd') -Encoding ASCII
-    Add-SystemPath $InstallDir
-}
-
 # Neovim is a whole tree (bin, runtime, ...), not one exe, so it unpacks under $ToolsRoot
 # and only bin/ goes on PATH.
 function Direct-Neovim {

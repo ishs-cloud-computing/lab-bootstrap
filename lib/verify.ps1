@@ -42,10 +42,6 @@ function Invoke-Verification {
         }
     }
 
-    # mdv is our launcher .cmd, not a versioned binary, so 'on PATH' is the whole check.
-    if (Test-Tool 'mdv') { Write-Ok ("{0,-11} launcher on PATH" -f 'mdv') }
-    else { Write-Err ("{0,-11} not on PATH" -f 'mdv'); $fails += 'mdv' }
-
     $ssh = Get-Service -Name 'ssh-agent' -ErrorAction SilentlyContinue
     if ($ssh) { Write-Ok ("{0,-11} {1} ({2})" -f 'ssh-agent', $ssh.Status, $ssh.StartType) }
     else      { Write-Err ("{0,-11} service missing" -f 'ssh-agent') }

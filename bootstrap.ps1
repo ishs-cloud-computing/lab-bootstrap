@@ -8,7 +8,7 @@
 
 .DESCRIPTION
     Installs AWS CLI v2, SSM plugin, Helm, eksctl, kubectl, Terraform, VS Code, k9s,
-    zoxide, Mydoo Viewer (with an mdv launcher command) and Neovim with mini.nvim.
+    zoxide and Neovim with mini.nvim.
     Direct download from each vendor first (no winget metadata overhead, 2-5 min faster on a
     fresh PC); winget as the fallback when a vendor download fails.
     Idempotent: already-installed tools are skipped. Needs admin; self-elevates via UAC.
@@ -187,7 +187,6 @@ $ok = (Install-Tool -Name 'Terraform'    -Cmd 'terraform'              -WingetId
 $ok = (Install-Tool -Name 'VS Code'      -Cmd 'code'                   -WingetId 'Microsoft.VisualStudioCode'  -Direct   ${function:Direct-VSCode})    -and $ok
 $ok = (Install-Tool -Name 'k9s'          -Cmd 'k9s'                    -WingetId 'Derailed.k9s'                -Direct   ${function:Direct-K9s})       -and $ok
 $ok = (Install-Tool -Name 'zoxide'       -Cmd 'zoxide'                 -WingetId 'ajeetdsouza.zoxide'          -Direct   ${function:Direct-Zoxide})    -and $ok
-$ok = (Install-Tool -Name 'Mydoo (mdv)'  -Cmd 'mdv'                    -WingetId $null                         -Direct   ${function:Direct-Mydoo})     -and $ok
 $ok = (Install-Tool -Name 'Neovim'       -Cmd 'nvim'                   -WingetId 'Neovim.Neovim'               -Direct   ${function:Direct-Neovim})    -and $ok
 $ok = (Install-MiniNvim)                 -and $ok   # after Neovim: plugs into its runtime tree
 $ok = (Install-VSCodeConfig)             -and $ok   # after VS Code: Terraform extension + trust off
